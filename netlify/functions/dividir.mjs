@@ -31,7 +31,8 @@ Responda SOMENTE com um objeto JSON neste formato exato:
 
 Regras:
 - Uma "sessão" é um bloco curto com fim claro (poucos minutos a ~45 min). Se o item é grande, quebre em várias sessões pequenas, na ordem de execução.
-- "passos": ações concretas e literais, começando por um verbo. Nada de reflexão ("pensar sobre", "analisar", "entender") — só ação física/observável.
+- IMPORTANTE — mantenha o CONTEXTO do item original. O "titulo" deve ser específico e se explicar sozinho, incluindo o assunto/objeto concreto do texto original. NUNCA use títulos genéricos como "Fazer ligação", "Organizar", "Enviar e-mail". Ex.: se o item é "ligar pra mãe sobre o aniversário", o título é "Ligar para a mãe sobre o aniversário", não "Fazer ligação".
+- "passos": ações concretas e literais, começando por um verbo, também mencionando o assunto concreto. Nada de reflexão ("pensar sobre", "analisar", "entender") — só ação física/observável.
 - "energiaMin"/"cognicaoMin": o mínimo necessário. Tarefas mecânicas = baixa; tarefas que exigem foco/decisão = alta.
 - "tempoEstimadoMin": um número realista (5, 10, 15, 25 ou 45).
 - Escreva tudo em português simples e acolhedor.`;
