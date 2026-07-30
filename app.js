@@ -1072,7 +1072,7 @@ function criarItemDeSessaoIA(s, origem) {
     tempoEstimadoMin: Number(s.tempoEstimadoMin) || 15,
     energiaMin: ['baixa', 'media', 'alta'].includes(s.energiaMin) ? s.energiaMin : 'media',
     cognicaoMin: ['baixa', 'media', 'alta'].includes(s.cognicaoMin) ? s.cognicaoMin : 'media',
-    prazo: null,
+    prazo: /^\d{4}-\d{2}-\d{2}$/.test(s.prazo || '') ? s.prazo : null,
     impacto: ['baixo', 'medio', 'alto'].includes(s.impacto) ? s.impacto : 'baixo',
     origemEntrada: origem || null
   };
