@@ -36,7 +36,10 @@ Regras:
 - "passos": ações concretas e literais, começando por um verbo, também mencionando o assunto concreto. Nada de reflexão ("pensar sobre", "analisar", "entender") — só ação física/observável.
 - "energiaMin"/"cognicaoMin": o mínimo necessário. Tarefas mecânicas = baixa; tarefas que exigem foco/decisão = alta.
 - "impacto": deduza do texto (algo importante/urgente/para o chefe = alto; trivial = baixo).
-- "prazo": se o texto indicar um prazo (ex.: "sexta", "amanhã", "até segunda", "dia 20", "próxima semana"), calcule a DATA ABSOLUTA a partir da data de hoje informada e preencha no formato YYYY-MM-DD. Se várias sessões vierem do mesmo item, todas herdam esse prazo. Se não houver prazo no texto, use null.
+- "prazo": preencha no formato YYYY-MM-DD, senão null. Regras:
+  (a) Data explícita "dia/mês" (ex.: "14/08", "20/12"): use EXATAMENTE esse dia e mês, no ano atual (ou no próximo ano se a data já passou). Ex.: "14/08" com hoje em 2026 => "2026-08-14".
+  (b) Data relativa (ex.: "sexta", "amanhã", "até segunda", "próxima semana"): calcule a partir da data de hoje informada.
+  (c) IMPORTANTE: quando o texto contém VÁRIAS tarefas distintas, cada tarefa usa o prazo mencionado JUNTO DELA. NÃO aplique o prazo de uma tarefa às outras. Uma tarefa sem prazo próprio fica com null.
 - "tempoEstimadoMin": um número realista (5, 10, 15, 25 ou 45).
 - Escreva tudo em português simples e acolhedor.`;
 
