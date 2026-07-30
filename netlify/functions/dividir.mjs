@@ -38,17 +38,25 @@ Regras:
 - "impacto": deduza do texto (algo importante/urgente/para o chefe = alto; trivial = baixo).
 - "prazo": preencha no formato YYYY-MM-DD, senão null. Regras:
   (a) Data explícita "dia/mês" (ex.: "14/08", "20/12"): use EXATAMENTE esse dia e mês, no ano atual (ou no próximo ano se a data já passou). Ex.: "14/08" com hoje em 2026 => "2026-08-14".
-  (b) Data relativa (ex.: "sexta", "amanhã", "até segunda", "próxima semana"): calcule a partir da data de hoje informada.
+  (b) Nome de dia da semana ("sexta", "segunda", "quinta"...): use EXATAMENTE a data da tabela "Próximas ocorrências" fornecida na mensagem (é a ocorrência mais próxima, dentro dos próximos 7 dias — a MESMA semana). NUNCA pule para a semana seguinte. "amanhã" = a data de amanhã informada. "hoje" = a data de hoje.
   (c) IMPORTANTE: quando o texto contém VÁRIAS tarefas distintas, cada tarefa usa o prazo mencionado JUNTO DELA. NÃO aplique o prazo de uma tarefa às outras. Uma tarefa sem prazo próprio fica com null.
 - "tempoEstimadoMin": um número realista (5, 10, 15, 25 ou 45).
 - Escreva tudo em português simples e acolhedor.`;
 
-function hojeSaoPaulo() {
-  const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' });
+function refSemana() {
   const iso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-  const partes = fmt.formatToParts(new Date());
-  const dia = partes.find(p => p.type === 'weekday');
-  return { iso, diaSemana: dia ? dia.value : '' };
+  const base = new Date(iso + 'T12:00:00Z'); // meio-dia UTC evita erro de fuso
+  const nomes = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  const diaSemana = nomes[base.getUTCDay()];
+  const map = {};
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(base.getTime() + i * 86400000);
+    const nome = nomes[d.getUTCDay()];
+    if (!(nome in map)) map[nome] = d.toISOString().slice(0, 10); // 1ª ocorrência = mais próxima
+  }
+  const amanha = new Date(base.getTime() + 86400000).toISOString().slice(0, 10);
+  const tabela = Object.entries(map).map(([k, v]) => `${k}=${v}`).join(', ');
+  return { iso, diaSemana, amanha, tabela };
 }
 
 export default async (req) => {
@@ -62,15 +70,15 @@ export default async (req) => {
   const texto = body && typeof body.texto === 'string' ? body.texto.trim() : '';
   if (!texto) return json({ erro: 'texto faltando' }, 400);
 
-  const { iso, diaSemana } = hojeSaoPaulo();
+  const { iso, diaSemana, amanha, tabela } = refSemana();
 
   const payload = {
     model: 'llama-3.3-70b-versatile',
-    temperature: 0.4,
+    temperature: 0.2,
     response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: INSTRUCAO },
-      { role: 'user', content: `Hoje é ${iso} (${diaSemana}). Item da Entrada: "${texto}". Responda em JSON.` }
+      { role: 'user', content: `Hoje é ${iso} (${diaSemana}). amanhã=${amanha}. Próximas ocorrências dos dias da semana (use estas datas exatas): ${tabela}. Item da Entrada: "${texto}". Responda em JSON.` }
     ]
   };
 
