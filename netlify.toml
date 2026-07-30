@@ -1,0 +1,17 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Rotas amigáveis para as funções (bastidores)
+[[redirects]]
+  from = "/api/dividir"
+  to = "/.netlify/functions/dividir"
+  status = 200
+
+[[redirects]]
+  from = "/api/dados"
+  to = "/.netlify/functions/dados"
+  status = 200

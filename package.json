@@ -1,0 +1,10 @@
+{
+  "name": "follow-the-breadcrumb",
+  "version": "1.0.0",
+  "description": "Extensão da função executiva — um passo de cada vez",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^8.0.0"
+  }
+}

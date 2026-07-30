@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#b8693a">
+<title>E agora?</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand-row">
+    <div class="brand">🍞 E agora?</div>
+    <div class="brand-right">
+      <span id="sync-badge" class="sync-badge" title="sincronização"></span>
+      <button id="btn-config" class="icon-btn" title="Configurações">⚙</button>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-view="agora">Agora</button>
+    <button class="tab" data-view="entrada">Entrada</button>
+    <button class="tab" data-view="tarefas">Tarefas</button>
+    <button class="tab" data-view="rotinas">Rotinas</button>
+  </nav>
+</header>
+
+<main id="app"></main>
+
+<button id="fab-despejo" class="fab" title="Jogar algo na Entrada">+</button>
+
+<div id="modal-root"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
