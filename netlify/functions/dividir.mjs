@@ -1,6 +1,6 @@
-// Bastidores: usa a IA (Google Gemini) para transformar um item bagunçado da Entrada
+// Bastidores: usa a IA (Groq, gratuito) para transformar um item bagunçado da Entrada
 // em uma ou mais SESSÕES prontas (com critério de conclusão, "não faz parte", passos, etc).
-// A chave do Gemini fica só aqui no servidor, nunca aparece para o navegador.
+// A chave da IA fica só aqui no servidor, nunca aparece para o navegador.
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -9,48 +9,35 @@ function json(obj, status = 200) {
   });
 }
 
-const SCHEMA = {
-  type: 'object',
-  properties: {
-    sessoes: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          titulo: { type: 'string' },
-          area: { type: 'string' },
-          criterioConclusao: { type: 'string' },
-          naoFazParte: { type: 'string' },
-          passos: { type: 'array', items: { type: 'string' } },
-          tempoEstimadoMin: { type: 'integer' },
-          energiaMin: { type: 'string', enum: ['baixa', 'media', 'alta'] },
-          cognicaoMin: { type: 'string', enum: ['baixa', 'media', 'alta'] },
-          impacto: { type: 'string', enum: ['baixo', 'medio', 'alto'] }
-        },
-        required: ['titulo', 'area', 'criterioConclusao', 'passos', 'tempoEstimadoMin', 'energiaMin', 'cognicaoMin', 'impacto']
-      }
-    }
-  },
-  required: ['sessoes']
-};
-
 const INSTRUCAO = `Você ajuda uma pessoa com dificuldade de função executiva (TDAH) a sair da análise e entrar em ação.
 Recebe um item solto e bagunçado que ela precisa fazer. Sua tarefa: transformá-lo em UMA OU MAIS sessões executáveis.
 
+Responda SOMENTE com um objeto JSON neste formato exato:
+{
+  "sessoes": [
+    {
+      "titulo": "string curto",
+      "area": "uma palavra: Trabalho, Casa, Saúde, Pessoal, Estudos ou Finanças",
+      "criterioConclusao": "como sei que posso parar? objetivo e verificável",
+      "naoFazParte": "o que NÃO fazer nesta sessão (ou string vazia)",
+      "passos": ["2 a 5 ações concretas no imperativo"],
+      "tempoEstimadoMin": 15,
+      "energiaMin": "baixa | media | alta",
+      "cognicaoMin": "baixa | media | alta",
+      "impacto": "baixo | medio | alto"
+    }
+  ]
+}
+
 Regras:
 - Uma "sessão" é um bloco curto com fim claro (poucos minutos a ~45 min). Se o item é grande, quebre em várias sessões pequenas, na ordem de execução.
-- "passos": 2 a 5 ações concretas e literais, no imperativo, começando por um verbo. Nada de reflexão ("pensar sobre", "analisar", "entender") — só ação física/observável.
-- "criterioConclusao": responda "como sei que posso parar?" de forma objetiva e verificável.
-- "naoFazParte": liste o que NÃO deve ser feito nesta sessão para evitar expansão de escopo (ou string vazia se não se aplica).
-- "area": uma palavra como Trabalho, Casa, Saúde, Pessoal, Estudos, Finanças.
-- "tempoEstimadoMin": realista (5, 10, 15, 25, 45).
-- "energiaMin" e "cognicaoMin": o mínimo necessário (baixa/media/alta). Tarefas mecânicas = baixa; tarefas que exigem foco/decisão = alta.
-- "impacto": baixo/medio/alto conforme a importância.
-- Escreva tudo em português simples e acolhedor.
-Responda SOMENTE no formato JSON pedido.`;
+- "passos": ações concretas e literais, começando por um verbo. Nada de reflexão ("pensar sobre", "analisar", "entender") — só ação física/observável.
+- "energiaMin"/"cognicaoMin": o mínimo necessário. Tarefas mecânicas = baixa; tarefas que exigem foco/decisão = alta.
+- "tempoEstimadoMin": um número realista (5, 10, 15, 25 ou 45).
+- Escreva tudo em português simples e acolhedor.`;
 
 export default async (req) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return json({ erro: 'sem_chave', mensagem: 'Chave da IA não configurada.' }, 503);
 
   if (req.method !== 'POST') return json({ erro: 'metodo nao suportado' }, 405);
@@ -60,24 +47,24 @@ export default async (req) => {
   const texto = body && typeof body.texto === 'string' ? body.texto.trim() : '';
   if (!texto) return json({ erro: 'texto faltando' }, 400);
 
-  const model = 'gemini-2.0-flash';
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
   const payload = {
-    systemInstruction: { parts: [{ text: INSTRUCAO }] },
-    contents: [{ role: 'user', parts: [{ text: `Item da Entrada: "${texto}"` }] }],
-    generationConfig: {
-      temperature: 0.4,
-      responseMimeType: 'application/json',
-      responseSchema: SCHEMA
-    }
+    model: 'llama-3.3-70b-versatile',
+    temperature: 0.4,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: INSTRUCAO },
+      { role: 'user', content: `Item da Entrada: "${texto}". Responda em JSON.` }
+    ]
   };
 
   let resp;
   try {
-    resp = await fetch(endpoint, {
+    resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        'authorization': 'Bearer ' + apiKey
+      },
       body: JSON.stringify(payload)
     });
   } catch (e) {
@@ -92,7 +79,7 @@ export default async (req) => {
   let data;
   try { data = await resp.json(); } catch (e) { return json({ erro: 'resposta_invalida' }, 502); }
 
-  const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const txt = data?.choices?.[0]?.message?.content;
   if (!txt) return json({ erro: 'resposta_vazia' }, 502);
 
   let parsed;
