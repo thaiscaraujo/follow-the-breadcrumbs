@@ -24,7 +24,8 @@ Responda SOMENTE com um objeto JSON neste formato exato:
       "tempoEstimadoMin": 15,
       "energiaMin": "baixa | media | alta",
       "cognicaoMin": "baixa | media | alta",
-      "impacto": "baixo | medio | alto"
+      "impacto": "baixo | medio | alto",
+      "prazo": "YYYY-MM-DD se o texto indicar prazo, senão null"
     }
   ]
 }
@@ -34,8 +35,18 @@ Regras:
 - IMPORTANTE — mantenha o CONTEXTO do item original. O "titulo" deve ser específico e se explicar sozinho, incluindo o assunto/objeto concreto do texto original. NUNCA use títulos genéricos como "Fazer ligação", "Organizar", "Enviar e-mail". Ex.: se o item é "ligar pra mãe sobre o aniversário", o título é "Ligar para a mãe sobre o aniversário", não "Fazer ligação".
 - "passos": ações concretas e literais, começando por um verbo, também mencionando o assunto concreto. Nada de reflexão ("pensar sobre", "analisar", "entender") — só ação física/observável.
 - "energiaMin"/"cognicaoMin": o mínimo necessário. Tarefas mecânicas = baixa; tarefas que exigem foco/decisão = alta.
+- "impacto": deduza do texto (algo importante/urgente/para o chefe = alto; trivial = baixo).
+- "prazo": se o texto indicar um prazo (ex.: "sexta", "amanhã", "até segunda", "dia 20", "próxima semana"), calcule a DATA ABSOLUTA a partir da data de hoje informada e preencha no formato YYYY-MM-DD. Se várias sessões vierem do mesmo item, todas herdam esse prazo. Se não houver prazo no texto, use null.
 - "tempoEstimadoMin": um número realista (5, 10, 15, 25 ou 45).
 - Escreva tudo em português simples e acolhedor.`;
+
+function hojeSaoPaulo() {
+  const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const iso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const partes = fmt.formatToParts(new Date());
+  const dia = partes.find(p => p.type === 'weekday');
+  return { iso, diaSemana: dia ? dia.value : '' };
+}
 
 export default async (req) => {
   const apiKey = process.env.GROQ_API_KEY;
@@ -48,13 +59,15 @@ export default async (req) => {
   const texto = body && typeof body.texto === 'string' ? body.texto.trim() : '';
   if (!texto) return json({ erro: 'texto faltando' }, 400);
 
+  const { iso, diaSemana } = hojeSaoPaulo();
+
   const payload = {
     model: 'llama-3.3-70b-versatile',
     temperature: 0.4,
     response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: INSTRUCAO },
-      { role: 'user', content: `Item da Entrada: "${texto}". Responda em JSON.` }
+      { role: 'user', content: `Hoje é ${iso} (${diaSemana}). Item da Entrada: "${texto}". Responda em JSON.` }
     ]
   };
 
