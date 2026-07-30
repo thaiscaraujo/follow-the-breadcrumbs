@@ -191,19 +191,45 @@ function scoreItem(item, checkin) {
   return { fit, urgencia, total: fit + urgencia };
 }
 
+function diasAtePrazo(prazo) {
+  if (!prazo) return null;
+  return Math.floor((new Date(prazo + 'T23:59:59').getTime() - Date.now()) / 86400000);
+}
+
 function buildJustificativa(scored, checkin) {
+  const it = scored.item;
   const reasons = [];
-  if (scored.item.estadoContinuidade) {
+  if (it.estadoContinuidade) {
     reasons.push('é de onde você parou — fica fácil de retomar');
-  } else if (scored.item.tipo === 'preparatoria') {
+  } else if (it.tipo === 'preparatoria') {
     reasons.push('é uma preparação leve para facilitar o que vem depois');
   } else {
+    const cabeca = { baixa: 'confusa', media: 'normal', alta: 'muito focada' }[checkin.cognicao] || checkin.cognicao;
     reasons.push(`cabe nos ${checkin.tempoMin} min que você tem`);
-    reasons.push(`combina com sua energia ${NIVEL_LABEL[checkin.energia]}`);
-    reasons.push(`dá pra fazer com a cabeça ${NIVEL_LABEL[checkin.cognicao]}`);
+    reasons.push(`combina com energia ${NIVEL_LABEL[checkin.energia]} e cabeça ${cabeca}`);
   }
-  if (scored.urgencia >= 30) reasons.push('e é importante ou tem prazo perto agora');
-  return 'Escolhi esta sessão porque ' + reasons.join(', ') + '.';
+  const d = diasAtePrazo(it.prazo);
+  if (d !== null) {
+    if (d <= 0) reasons.push('e o prazo é hoje (ou já venceu)');
+    else if (d === 1) reasons.push('e o prazo é amanhã');
+    else if (d <= 3) reasons.push(`e o prazo é em ${d} dias`);
+    else if (d <= 7) reasons.push('e o prazo está chegando');
+  }
+  if (it.impacto === 'alto') reasons.push('e é de alto impacto');
+  return 'Escolhi esta porque ' + reasons.join(', ') + '.';
+}
+
+function alertaImportanteHtml(alerta) {
+  if (!alerta) return '';
+  return `
+    <div class="card">
+      <p class="muted">⚠ <b>${escapeHtml(alerta.item.titulo)}</b> é importante${diasAtePrazo(alerta.item.prazo) !== null ? ' (tem prazo)' : ''}, mas não cabe no seu estado agora.</p>
+      <div class="btn-row">
+        <button class="btn btn-secondary btn-sm" data-action="preparar-terreno-para" data-id="${alerta.item.id}">Preparar terreno</button>
+        <button class="btn btn-secondary btn-sm" data-action="reduzir-escopo" data-id="${alerta.item.id}">Reduzir escopo</button>
+        <button class="btn btn-ghost btn-sm" data-action="renegociar-prazo" data-id="${alerta.item.id}">Renegociar prazo</button>
+      </div>
+    </div>`;
 }
 
 function pickSession(excludeId) {
@@ -215,7 +241,12 @@ function pickSession(excludeId) {
   scored.sort((a, b) => b.total - a.total);
   const best = scored[0];
 
-  const alerta = scored.find(s => s.item.id !== best.item.id && s.urgencia >= 30 && s.fit < 10) || null;
+  const alerta = scored.find(s => {
+    if (s.item.id === best.item.id) return false;
+    const d = diasAtePrazo(s.item.prazo);
+    const importante = s.item.impacto === 'alto' || (d !== null && d <= 3);
+    return importante && s.fit < 20;
+  }) || null;
 
   if (best.total < 15) return { fallback: true, alerta };
 
@@ -360,18 +391,7 @@ function renderFallbackHtml(alerta) {
   const prep = state.itens.find(i => i.status === 'pendente' && i.tipo === 'preparatoria');
   const leve = state.itens.find(i => i.status === 'pendente' && i.tipo === 'leve');
 
-  let alertaHtml = '';
-  if (alerta) {
-    alertaHtml = `
-      <div class="card">
-        <p class="muted">⚠ <b>${escapeHtml(alerta.item.titulo)}</b> é importante mas não cabe no seu estado agora.</p>
-        <div class="btn-row">
-          <button class="btn btn-secondary btn-sm" data-action="preparar-terreno-para" data-id="${alerta.item.id}">Preparar terreno</button>
-          <button class="btn btn-secondary btn-sm" data-action="reduzir-escopo" data-id="${alerta.item.id}">Reduzir escopo</button>
-          <button class="btn btn-ghost btn-sm" data-action="renegociar-prazo" data-id="${alerta.item.id}">Renegociar prazo</button>
-        </div>
-      </div>`;
-  }
+  const alertaHtml = alertaImportanteHtml(alerta);
 
   return `
     <div class="card">
@@ -400,10 +420,17 @@ function renderSessaoCard(item) {
     retomandoHtml = `<p class="muted">↩ Retomando — você já fez: ${escapeHtml(ec.feito) || '—'}.</p>`;
   }
 
+  const origemHtml = item.origemEntrada && item.origemEntrada !== item.titulo
+    ? `<p class="muted">📌 Veio de: "${escapeHtml(item.origemEntrada)}"</p>` : '';
+
+  const d = diasAtePrazo(item.prazo);
+  const metaHtml = `<p class="muted">⏱ ${item.tempoEstimadoMin} min${item.prazo ? ` · 📅 prazo ${item.prazo}${d !== null && d <= 3 ? (d <= 0 ? ' (hoje!)' : d === 1 ? ' (amanhã)' : ` (em ${d} dias)`) : ''}` : ''}${item.impacto === 'alto' ? ' · ‼ alto impacto' : ''}</p>`;
+
   return `
     <div class="card">
       <div class="badge-area">${escapeHtml(areaNome(item.areaId) || 'Sem área')}</div>
       <h2>${escapeHtml(item.titulo)}</h2>
+      ${origemHtml}
       ${retomandoHtml}
       ${item.passos.length > 1 ? `<div class="progress-dots">${dots}</div>` : ''}
       <div class="section-label">Passo atual</div>
@@ -411,6 +438,7 @@ function renderSessaoCard(item) {
       <div class="section-label">Como sei que posso parar</div>
       <p>${escapeHtml(item.criterioConclusao || '—')}</p>
       ${item.naoFazParte ? `<div class="nao-parte">🚫 Não faz parte desta sessão: ${escapeHtml(item.naoFazParte)}</div>` : ''}
+      ${metaHtml}
       <div class="justificativa">${escapeHtml(lastJustificativa || '')}</div>
       <div class="btn-row">
         <button class="btn btn-primary" data-action="concluir-passo" data-id="${item.id}">✅ Concluí</button>
@@ -419,9 +447,11 @@ function renderSessaoCard(item) {
       </div>
       <div class="btn-row">
         <button class="btn btn-ghost btn-sm" data-action="trocar" data-id="${item.id}">⏭️ Trocar</button>
-        <button class="btn btn-ghost btn-sm" data-action="outra-tarefa" data-id="${item.id}">➕ Isso virou outra tarefa</button>
+        <button class="btn btn-ghost btn-sm" data-action="editar-item" data-id="${item.id}">✎ Editar (prazo/impacto)</button>
+        <button class="btn btn-ghost btn-sm" data-action="outra-tarefa" data-id="${item.id}">➕ Virou outra tarefa</button>
       </div>
     </div>
+    ${alertaImportanteHtml(lastAlerta)}
     <button class="btn btn-ghost btn-sm btn-block" data-action="mudou-estado">Mudou seu estado? Refazer as 3 perguntas</button>`;
 }
 
@@ -458,13 +488,17 @@ function renderTarefasHtml() {
   const concluidas = state.itens.filter(i => i.status === 'concluida');
 
   function itemLine(i) {
+    const origem = i.origemEntrada && i.origemEntrada !== i.titulo
+      ? `<div class="muted">📌 Veio de: "${escapeHtml(i.origemEntrada)}"</div>` : '';
     return `
       <div class="list-item">
         <div class="badge-area">${escapeHtml(areaNome(i.areaId))}</div>
         <b>${escapeHtml(i.titulo)}</b>
-        <div class="muted">${i.tempoEstimadoMin} min · energia ${NIVEL_LABEL[i.energiaMin]} · cognição ${NIVEL_LABEL[i.cognicaoMin]}${i.prazo ? ' · prazo ' + i.prazo : ''}</div>
+        ${origem}
+        <div class="muted">${i.tempoEstimadoMin} min · energia ${NIVEL_LABEL[i.energiaMin]} · cognição ${NIVEL_LABEL[i.cognicaoMin]}${i.prazo ? ' · 📅 ' + i.prazo : ''}${i.impacto === 'alto' ? ' · ‼ alto impacto' : ''}</div>
         <div class="btn-row">
           ${i.status === 'pendente' ? `<button class="btn btn-secondary btn-sm" data-action="iniciar-item" data-id="${i.id}">Começar agora</button>` : ''}
+          ${i.status === 'pendente' ? `<button class="btn btn-ghost btn-sm" data-action="editar-item-tarefa" data-id="${i.id}">✎ Editar</button>` : ''}
           <button class="btn btn-ghost btn-sm" data-action="excluir-item" data-id="${i.id}">Excluir</button>
         </div>
       </div>`;
@@ -888,6 +922,9 @@ function bindViewEvents() {
   if (currentView === 'tarefas') {
     const btnNova = document.getElementById('btn-nova-sessao');
     if (btnNova) btnNova.addEventListener('click', openNovaSessaoModal);
+    document.querySelectorAll('[data-action="editar-item-tarefa"]').forEach(el => {
+      el.addEventListener('click', () => openEditItemModal(el.dataset.id));
+    });
     document.querySelectorAll('[data-action="iniciar-item"]').forEach(el => {
       el.addEventListener('click', () => {
         sessaoAtualId = el.dataset.id;
@@ -937,6 +974,7 @@ function handleAgoraAction(action, id) {
   if (action === 'iniciar-item') { sessaoAtualId = id; lastJustificativa = 'Você escolheu esta agora.'; render(); return; }
   if (action === 'preparar-terreno-para') { criarPreparatoriaPara(id); render(); return; }
   if (action === 'reduzir-escopo') { openEditItemModal(id); return; }
+  if (action === 'editar-item') { openEditItemModal(id); return; }
   if (action === 'renegociar-prazo') { openRenegociarModal(id); return; }
 
   const item = itemById(id);
@@ -1012,7 +1050,7 @@ async function dividirComIA(entradaId) {
     return;
   }
 
-  const criadas = resposta.dados.sessoes.map((s, idx) => criarItemDeSessaoIA(s, idx === 0 ? e.texto : null));
+  const criadas = resposta.dados.sessoes.map((s) => criarItemDeSessaoIA(s, e.texto));
   state.itens.push(...criadas);
   state.entrada = state.entrada.filter(x => x.id !== entradaId);
   saveState();
