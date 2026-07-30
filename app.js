@@ -52,6 +52,16 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// Quebra um texto colado em vários itens (uma tarefa por linha), limpando marcadores.
+function adicionarItensDespejo(textoBruto) {
+  const linhas = String(textoBruto || '')
+    .split(/\r?\n/)
+    .map(l => l.replace(/^\s*(?:[-*•·—]|\d+[.)])\s*/, '').trim())
+    .filter(Boolean);
+  linhas.forEach(t => state.entrada.push({ id: uid(), texto: t, criadoEm: Date.now() }));
+  return linhas.length;
+}
+
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
@@ -821,7 +831,7 @@ function openOutraTarefaModal() {
   document.getElementById('btn-confirmar-outra').addEventListener('click', () => {
     const txt = document.getElementById('ot-texto').value.trim();
     if (txt) {
-      state.entrada.push({ id: uid(), texto: txt, criadoEm: Date.now() });
+      adicionarItensDespejo(txt);
       saveState();
     }
     closeModal();
@@ -840,7 +850,7 @@ function openDespejoRapidoModal() {
   document.getElementById('btn-confirmar-despejo-rapido').addEventListener('click', () => {
     const txt = document.getElementById('dr-texto').value.trim();
     if (txt) {
-      state.entrada.push({ id: uid(), texto: txt, criadoEm: Date.now() });
+      adicionarItensDespejo(txt);
       saveState();
       if (currentView === 'entrada') render();
     }
@@ -900,7 +910,7 @@ function bindViewEvents() {
     if (btnAdd) btnAdd.addEventListener('click', () => {
       const txt = document.getElementById('txt-despejo').value.trim();
       if (!txt) return;
-      state.entrada.push({ id: uid(), texto: txt, criadoEm: Date.now() });
+      adicionarItensDespejo(txt);
       saveState();
       render();
     });
